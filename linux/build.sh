@@ -28,29 +28,31 @@ create_directory_if_not_found() {
 
 DEFAULT_WEBRTC_URL="https://chromium.googlesource.com/external/webrtc.git"
 DEPOT_TOOLS="$PROJECT_ROOT/depot_tools"
+LINARO_TOOLCHAIN="gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux"
+LINARO_TOOLCHAIN_URL="https://releases.linaro.org/archive/14.09/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.bz2"
+LINARO_TOOLCHAIN_PATH="$PROJECT_ROOT/toolchains"
 WEBRTC_ROOT="$PROJECT_ROOT/webrtc"
 create_directory_if_not_found "$WEBRTC_ROOT"
 BUILD="$WEBRTC_ROOT/libjingle_peerconnection_builds"
-WEBRTC_TARGET="AppRTCMobile"
+WEBRTC_TARGET="AppRTCLinux"
 
 ANDROID_TOOLCHAINS="$WEBRTC_ROOT/src/third_party/android_tools/ndk/toolchains"
+PATH="$PATH:$DEPOT_TOOLS"
 
 exec_ninja() {
   echo "Running ninja"
-  ninja -C $1 $WEBRTC_TARGET
+  ninja -C $1 # $WEBRTC_TARGET
 }
 
 # Installs the required dependencies on the machine
 install_dependencies() {
     sudo apt-get -y install wget git gnupg flex bison gperf build-essential zip curl subversion pkg-config libglib2.0-dev libgtk2.0-dev libxtst-dev libxss-dev libpci-dev libdbus-1-dev libgconf2-dev libgnome-keyring-dev libnss3-dev
-    #Download the latest script to install the android dependencies for ubuntu
-    curl https://chromium.googlesource.com/chromium/src/+/master/build/install-build-deps-android.sh?format=TEXT | base64 -d > install-build-deps-android.sh
+    #Download the latest script to install the linux dependencies for ubuntu
     curl https://chromium.googlesource.com/chromium/src/+/master/build/install-build-deps.sh?format=TEXT | base64 -d > install-build-deps.sh
-    chmod u+x ./install-build-deps.sh
     #use bash (not dash which is default) to run the script
-    sudo /bin/bash ./install-build-deps-android.sh
+    sudo /bin/bash ./install-build-deps.sh
     #delete the file we just downloaded... not needed anymore
-    #rm install-build-deps-android.sh
+    #rm install-build-deps.sh
 }
 
 # Update/Get/Ensure the Gclient Depot Tools
@@ -74,10 +76,25 @@ pull_depot_tools() {
 		echo Pull the depot tools down to the latest
 		git pull
 	fi
-	PATH="$PATH:$DEPOT_TOOLS"
 
     # Navigate back
 	cd "$WORKING_DIR"
+}
+
+pull_linaro_toolchain() {
+	if [ ! -d ${LINARO_TOOLCHAIN_PATH} ];
+	then
+		mkdir -p ${LINARO_TOOLCHAIN_PATH}
+	fi
+	
+	cd ${LINARO_TOOLCHAIN_PATH}
+
+	if [ ! -d "${LINARO_TOOLCHAIN_PATH}/${LINARO_TOOLCHAIN}" ];
+	then
+		#curl -s ${LINARO_TOOLCHAIN_URL} -o ${LINARO_TOOLCHAIN}/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.bz2
+		wget ${LINARO_TOOLCHAIN_URL}
+		tar xvfpj gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.bz2
+	fi
 }
 
 # Update/Get the webrtc code base
@@ -89,7 +106,7 @@ pull_webrtc() {
     cd "$WEBRTC_ROOT"
 
     # Setup gclient config
-    echo Configuring gclient for Android build
+    echo Configuring gclient for Linux build
     if [ -z $USER_WEBRTC_URL ]
     then
         echo "User has not specified a different webrtc url. Using default"
@@ -99,8 +116,8 @@ pull_webrtc() {
         gclient config --name=src "$USER_WEBRTC_URL"
     fi
 
-    # Ensure our target os is correct building android
-	echo 'target_os = ["android", "unix"]' >> .gclient
+    # Ensure our target os is correct building linux
+	echo 'target_os = ["linux", "unix"]' >> .gclient
 
     # Get latest webrtc source
 	echo Pull down the latest from the webrtc repo
@@ -128,46 +145,100 @@ function wrbase() {
     export GYP_GENERATORS="ninja"
 }
 
+# add shared library option 
+# reference from https://www.chromium.org/developers/gyp-environment-variables
+function shared_library_option() {
+	export GYP_DEFINES="$GYP_DEFINES component=shared_library"
+}
+
 # Arm V7 with Neon
 function wrarmv7() {
     wrbase
-    export GYP_DEFINES="$GYP_DEFINES OS=android"
-    export GYP_GENERATOR_FLAGS="$GYP_GENERATOR_FLAGS output_dir=out_android_armeabi-v7a"
+    export GYP_DEFINES="$GYP_DEFINES OS=linux"
+    export GYP_GENERATOR_FLAGS="$GYP_GENERATOR_FLAGS output_dir=out_linux_armeabi-v7a"
     export GYP_CROSSCOMPILE=1
+
+	export CC=""
+	export CXX=""
+	export AR=""
+	export STRIP=""
+	export CC_host=""
+	export CXX_host=""
+
     echo "ARMv7 with Neon Build"
 }
 
 # Arm 64
 function wrarmv8() {
     wrbase
-    export GYP_DEFINES="$GYP_DEFINES OS=android target_arch=arm64 target_subarch=arm64"
-    export GYP_GENERATOR_FLAGS="output_dir=out_android_arm64-v8a"
+    export GYP_DEFINES="$GYP_DEFINES OS=linux target_arch=arm64 target_subarch=arm64"
+    export GYP_GENERATOR_FLAGS="output_dir=out_linux_arm64-v8a"
     export GYP_CROSSCOMPILE=1
+
+	export CC=""
+	export CXX=""
+	export AR=""
+	export STRIP=""
+	export CC_host=""
+	export CXX_host=""
+
     echo "ARMv8 with Neon Build"
 }
 
 # x86
 function wrX86() {
     wrbase
-    export GYP_DEFINES="$GYP_DEFINES OS=android target_arch=ia32"
-    export GYP_GENERATOR_FLAGS="output_dir=out_android_x86"
+    #export GYP_DEFINES="$GYP_DEFINES OS=linux target_arch=ia32"
+	export GYP_DEFINES="$GYP_DEFINES OS=linux target_arch=x86"
+    export GYP_GENERATOR_FLAGS="output_dir=out-linux-${WEBRTC_ARCH}"
+
+	export CC=""
+	export CXX=""
+	export AR=""
+	export STRIP=""
+	export CC_host=""
+	export CXX_host=""
+
     echo "x86 Build"
 }
 
 # x86_64
 function wrX86_64() {
     wrbase
-    export GYP_DEFINES="$GYP_DEFINES OS=android target_arch=x64"
-    export GYP_GENERATOR_FLAGS="output_dir=out_android_x86_64"
+    export GYP_DEFINES="$GYP_DEFINES OS=linux target_arch=x64"
+    export GYP_GENERATOR_FLAGS="output_dir=out-linux-${WEBRTC_ARCH}"
+
+	export CC=""
+	export CXX=""
+	export AR=""
+	export STRIP=""
+	export CC_host=""
+	export CXX_host=""
+
     echo "x86_64 Build"
 }
 
+function wrarm_linaro-gnueabihf() {
+    wrbase
+    export GYP_DEFINES="$GYP_DEFINES OS=linux"
+    export GYP_GENERATOR_FLAGS="$GYP_GENERATOR_FLAGS output_dir=out-linux-${WEBRTC_ARCH}"
+    export GYP_CROSSCOMPILE=1
+
+	export CC="${LINARO_TOOLCHAIN_PATH}/${LINARO_TOOLCHAIN}/bin/arm-linux-gnueabihf-gcc"
+	export CXX="${LINARO_TOOLCHAIN_PATH}/${LINARO_TOOLCHAIN}/bin/arm-linux-gnueabihf-g++"
+	export AR="${LINARO_TOOLCHAIN_PATH}/${LINARO_TOOLCHAIN}/bin/arm-linux-gnueabihf-ar"
+	export STRIP="${LINARO_TOOLCHAIN_PATH}/${LINARO_TOOLCHAIN}/bin/arm-linux-gnueabihf-strip"
+	export CC_host="gcc"
+	export CXX_host="g++"
+
+    echo "ARM with Linaro Build"
+}
 
 # Setup our defines for the build
 prepare_gyp_defines() {
-    # Configure environment for Android
-    echo Setting up build environment for Android
-    source "$WEBRTC_ROOT/src/build/android/envsetup.sh"
+    # Configure environment for Linux
+    echo Setting up build environment for Linux
+#    source "$WEBRTC_ROOT/src/build/android/envsetup.sh"
 
     # Check to see if the user wants to set their own gyp defines
     echo Export the base settings of GYP_DEFINES so we can define how we want to build
@@ -180,16 +251,27 @@ prepare_gyp_defines() {
         elif [ "$WEBRTC_ARCH" = "x86_64" ] ;
         then
             wrX86_64
-        elif [ "$WEBRTC_ARCH" = "armv7" ] ;
+#        elif [ "$WEBRTC_ARCH" = "armv7" ] ;
+#        then
+#           wrarmv7
+#        elif [ "$WEBRTC_ARCH" = "armv8" ] ;
+#        then
+#            wrarmv8
+        elif [ "$WEBRTC_ARCH" = "arm-linaro-gnueabihf" ] ;
         then
-            wrarmv7
-        elif [ "$WEBRTC_ARCH" = "armv8" ] ;
-        then
-            wrarmv8
+            wrarm_linaro-gnueabihf
         fi
     else
         echo "User has specified their own gyp defines"
         export GYP_DEFINES="$USER_GYP_DEFINES"
+    fi
+	
+	if [ -z $1 ]
+    then
+        echo "Disabled shared library option"
+    else
+        echo "Enabled shared library option"
+        shared_library_option
     fi
 
     echo "GYP_DEFINES=$GYP_DEFINES"
@@ -203,19 +285,22 @@ execute_build() {
     if [ "$WEBRTC_ARCH" = "x86" ] ;
     then
         ARCH="x86"
-        STRIP="$ANDROID_TOOLCHAINS/x86-4.9/prebuilt/linux-x86_64/bin/i686-linux-android-strip"
+#        STRIP="$ANDROID_TOOLCHAINS/x86-4.9/prebuilt/linux-x86_64/bin/i686-linux-strip"
     elif [ "$WEBRTC_ARCH" = "x86_64" ] ;
     then
         ARCH="x64"
-        STRIP="$ANDROID_TOOLCHAINS/x86_64-4.9/prebuilt/linux-x86_64/bin/x86_64-linux-android-strip"
-    elif [ "$WEBRTC_ARCH" = "armv7" ] ;
+#        STRIP="$ANDROID_TOOLCHAINS/x86_64-4.9/prebuilt/linux-x86_64/bin/x86_64-linux-strip"
+#    elif [ "$WEBRTC_ARCH" = "armv7" ] ;
+#    then
+#        ARCH="arm"
+#        STRIP="$ANDROID_TOOLCHAINS/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-eabi-strip"
+#    elif [ "$WEBRTC_ARCH" = "armv8" ] ;
+#    then
+#        ARCH="arm64"
+#        STRIP="$ANDROID_TOOLCHAINS/aarch64-linux-android-4.9/prebuilt/linux-x86_64/bin/aarch64-linux-strip"
+    elif [ "$WEBRTC_ARCH" = "linaro-gnueabihf" ] ;
     then
         ARCH="arm"
-        STRIP="$ANDROID_TOOLCHAINS/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-strip"
-    elif [ "$WEBRTC_ARCH" = "armv8" ] ;
-    then
-        ARCH="arm64"
-        STRIP="$ANDROID_TOOLCHAINS/aarch64-linux-android-4.9/prebuilt/linux-x86_64/bin/aarch64-linux-android-strip"
     fi
 
     if [ "$WEBRTC_DEBUG" = "true" ] ;
@@ -227,10 +312,12 @@ execute_build() {
         DEBUG_ARG='is_debug=false dcheck_always_on=true'
     fi
 
-    ARCH_OUT="out_android_${ARCH}"
+    ARCH_OUT="out-linux-${WEBRTC_ARCH}"
 
+#	${WEBRTC_ROOT}/src/build/linux/sysroot_scripts/install-sysroot.py --arch=arm
+	
     echo Generate projects using GN
-    gn gen "$ARCH_OUT/$BUILD_TYPE" --args="$DEBUG_ARG symbol_level=1 target_os=\"android\" target_cpu=\"${ARCH}\""
+    gn gen "$ARCH_OUT/$BUILD_TYPE" --args="$DEBUG_ARG symbol_level=1 target_os=\"linux\" target_cpu=\"${ARCH}\""
     #gclient runhooks
 
     REVISION_NUM=`get_webrtc_revision`
@@ -239,7 +326,7 @@ execute_build() {
 
     # Verify the build actually worked
     if [ $? -eq 0 ]; then
-        SOURCE_DIR="$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE"
+        SOURCE_DIR="$WEBRTC_ROOT/src/$WEBRTC_ARCH/$BUILD_TYPE"
         TARGET_DIR="$BUILD/$BUILD_TYPE"
         create_directory_if_not_found "$TARGET_DIR"
 
@@ -253,19 +340,21 @@ execute_build() {
         elif [ "$WEBRTC_ARCH" = "x86_64" ] ;
         then
         	ARCH_JNI="$TARGET_DIR/jni/x86_64"
-        elif [ "$WEBRTC_ARCH" = "armv7" ] ;
+#        elif [ "$WEBRTC_ARCH" = "armv7" ] ;
+#        then
+#        	ARCH_JNI="$TARGET_DIR/jni/armeabi-v7a"
+#        elif [ "$WEBRTC_ARCH" = "armv8" ] ;
+#        then
+#        	ARCH_JNI="$TARGET_DIR/jni/arm64-v8a"
+        elif [ "$WEBRTC_ARCH" = "linaro" ] ;
         then
-        	ARCH_JNI="$TARGET_DIR/jni/armeabi-v7a"
-        elif [ "$WEBRTC_ARCH" = "armv8" ] ;
-        then
-        	ARCH_JNI="$TARGET_DIR/jni/arm64-v8a"
+        	ARCH_JNI="$TARGET_DIR/jni/linaro"
         fi
         create_directory_if_not_found "$ARCH_JNI"
 
         # Copy the jars
-        cp -p "$SOURCE_DIR/lib.java/webrtc/sdk/android/libjingle_peerconnection_java.jar" "$TARGET_DIR/libs/libjingle_peerconnection.jar"
-        cp -p "$SOURCE_DIR/lib.java/webrtc/base/base_java.jar" "$TARGET_DIR/libs/base_java.jar"
-        cp -p "$SOURCE_DIR/lib.java/webrtc/modules/audio_device/audio_device_java.jar" "$TARGET_DIR/libs/audio_device_java.jar"
+#        cp -p "$SOURCE_DIR/lib.java/webrtc/sdk/android/libjingle_peerconnection_java.jar" "$TARGET_DIR/libs/libjingle_peerconnection.jar"
+#        cp -p "$SOURCE_DIR/lib.java/webrtc/base/base_java.jar" "$TARGET_DIR/libs/base_java.jar"
 
         # Strip the build only if its release
         if [ "$WEBRTC_DEBUG" = "true" ] ;
@@ -312,24 +401,47 @@ get_webrtc_revision() {
 
 get_webrtc() {
     pull_depot_tools &&
+	pull_linaro_toolchain &&
     pull_webrtc $1
 }
 
 # Updates webrtc and builds apprtc
 build_apprtc() {
-    export WEBRTC_ARCH=armv7
-    prepare_gyp_defines &&
-    execute_build
+#    export WEBRTC_ARCH=armv7
+#    prepare_gyp_defines $1 &&
+#    execute_build
 
-    export WEBRTC_ARCH=armv8
-    prepare_gyp_defines &&
-    execute_build
+#    export WEBRTC_ARCH=armv8
+#    prepare_gyp_defines $1 &&
+#    execute_build
 
+	export WEBRTC_DEBUG=true
     export WEBRTC_ARCH=x86
-    prepare_gyp_defines &&
+    prepare_gyp_defines $1 &&
     execute_build
 
+	export WEBRTC_DEBUG=false
+    export WEBRTC_ARCH=x86
+    prepare_gyp_defines $1 &&
+    execute_build	
+
+	export WEBRTC_DEBUG=true
     export WEBRTC_ARCH=x86_64
-    prepare_gyp_defines &&
+    prepare_gyp_defines $1 &&
     execute_build
+
+	export WEBRTC_DEBUG=false
+    export WEBRTC_ARCH=x86_64
+    prepare_gyp_defines $1 &&
+    execute_build
+
+	export WEBRTC_DEBUG=true
+    export WEBRTC_ARCH=arm-linaro-gnueabihf
+    prepare_gyp_defines $1 &&
+    execute_build
+
+	export WEBRTC_DEBUG=false
+    export WEBRTC_ARCH=arm-linaro-gnueabihf
+    prepare_gyp_defines $1 &&
+    execute_build		
 }

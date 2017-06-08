@@ -221,7 +221,7 @@ execute_build() {
     if [ "$WEBRTC_DEBUG" = "true" ] ;
     then
         BUILD_TYPE="Debug"
-        DEBUG_ARG='is_debug=true'
+        DEBUG_ARG='is_debug=false'
     else
         BUILD_TYPE="Release"
         DEBUG_ARG='is_debug=false dcheck_always_on=true'
@@ -271,10 +271,6 @@ execute_build() {
         if [ "$WEBRTC_DEBUG" = "true" ] ;
         then
             cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libjingle_peerconnection_so.so" "$ARCH_JNI/libjingle_peerconnection_so.so"
-            cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libboringssl.cr.so" "$ARCH_JNI/libboringssl.cr.so"
-            cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libbase.cr.so" "$ARCH_JNI/libbase.cr.so"
-            cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libc++_shared.so" "$ARCH_JNI/libc++_shared.so"
-            cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libprotobuf_lite.cr.so" "$ARCH_JNI/libprotobuf_lite.cr.so"
         else
             "$STRIP" -o "$ARCH_JNI/libjingle_peerconnection_so.so" "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libjingle_peerconnection_so.so" -s
         fi

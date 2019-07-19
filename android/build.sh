@@ -312,6 +312,11 @@ get_webrtc_revision() {
 
     if [ -z "$REVISION_NUMBER" ]
     then
+      REVISION_NUMBER=`git log -1 | grep 'Cr-Original-Commit-Position: refs/heads/master@{#' | egrep -o "[0-9]+}" | tr -d '}'`
+    fi
+
+    if [ -z "$REVISION_NUMBER" ]
+    then
       echo "Error grabbing revision number"
       exit 1
     fi

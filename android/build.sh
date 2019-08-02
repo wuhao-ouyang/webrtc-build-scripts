@@ -274,16 +274,7 @@ execute_build() {
         cp -p "$SOURCE_DIR/lib.java/modules/audio_device/audio_device_java.jar" "$TARGET_DIR/libs/audio_device_java.jar"
 
         # Strip the build only if its release
-        if [ "$WEBRTC_DEBUG" = "true" ] ;
-        then
-            cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libjingle_peerconnection_so.so" "$ARCH_JNI/libjingle_peerconnection_so.so"
-            #cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libboringssl.cr.so" "$ARCH_JNI/libboringssl.cr.so"
-            #cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libbase.cr.so" "$ARCH_JNI/libbase.cr.so"
-            #cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libc++_shared.so" "$ARCH_JNI/libc++_shared.so"
-            #cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libprotobuf_lite.cr.so" "$ARCH_JNI/libprotobuf_lite.cr.so"
-        else
-            "$STRIP" -o "$ARCH_JNI/libjingle_peerconnection_so.so" "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libjingle_peerconnection_so.so" -s
-        fi
+        cp -p "$WEBRTC_ROOT/src/$ARCH_OUT/$BUILD_TYPE/libjingle_peerconnection_so.so" "$ARCH_JNI/libjingle_peerconnection_so.so"
 
         cd "$TARGET_DIR"
         mkdir -p aidl
